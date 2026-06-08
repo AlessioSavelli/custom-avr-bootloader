@@ -1,0 +1,39 @@
+https://www.electronicwings.com/arduino/basics-to-developing-bootloader-for-arduino
+avr-gcc
+https://github.com/m3y54m/start-avr/tree/master
+https://gcc.gnu.org/onlinedocs/gcc/AVR-Options.html
+https://github.com/avrdudes/avr-libc/
+
+!!!
+https://github.com/m3y54m/simple-avr-bootloader
+
+https://tinusaur.com/guides/avr-gcc-toolchain/
+
+---
+
+- lock read access
+- to unlock read access, everything must be erased
+- bootloader protected by auto-write protection
+- serial communication protocol with the PC at 115200 baud
+	| start | start | length | length | src_id | dest_id | msg_id | payload | crc | crc | end | end |
+	- the PC asks questions, the microcontroller always replies
+	- response timeout: 1 second
+	- inter-byte timeout: 1 second
+	- acknowledgement command that acts as a capture / keep-alive
+	- reset request command
+	- command to write data to memory
+	- command to read data from memory
+
+- the IDs that carry data to write to memory have encrypted payloads.
+- the PC software cannot decrypt them
+
+- functions:
+	- PC receive
+	- PC transmit
+	- protocol wrapper
+	- protocol unwrapper
+	- decrypt payload
+	- encrypt payload
+	- write to memory
+	- read from memory
+	- reset

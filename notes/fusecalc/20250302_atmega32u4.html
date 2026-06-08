@@ -1,0 +1,1245 @@
+﻿<?xml version="1.0" encoding="us-ascii"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<!--Fuse Calculator Generated for atmega32u4 on December-30-09-->
+
+<head>
+  <title>AVR Fuse Calculator for ATmega32U4</title>
+
+  <script>
+    function setCharAt(oriStr, index, chr) {
+      return oriStr.substr(0, index) + chr + oriStr.substr(index + 1);
+    }
+
+    function applyMask(maskStr, currentValue) {
+      var result = String();
+      result = "11111111";
+
+      for (var i = 0; i < 8; i++) {
+        if (maskStr.charAt(i) == '1') {
+          result = setCharAt(result, i, maskStr.charAt(i + 8));
+        }
+        else {
+          result = setCharAt(result, i, currentValue.charAt(i));
+        }
+      }
+
+      return result;
+    }
+
+    function unapplyMask(maskStr, currentValue) {
+      var result = String();
+      result = "11111111";
+
+      for (var i = 0; i < 8; i++) {
+        if (maskStr.charAt(i) == '1') {
+          var newChr = '0';
+
+          if (maskStr.charAt(i + 8) == '0') {
+            newChr = '1';
+          }
+
+          result = setCharAt(result, i, newChr);
+        }
+        else {
+          result = setCharAt(result, i, currentValue.charAt(i));
+        }
+      }
+
+      return result;
+    }
+
+    function matchMask(maskStr, currentValue) {
+      var result = Boolean();
+      result = true;
+
+      for (var i = 0; i < 8; i++) {
+        if (maskStr.charAt(i) == '1') {
+          if (maskStr.charAt(i + 8) != currentValue.charAt(i)) {
+            result = false;
+            break;
+          }
+        }
+      }
+
+      return result;
+    }
+
+    function hexStrToBinStr(hexStr) {
+      return ensureLength(parseInt(ensureLength(hexStr, 2), 16).toString(2), 8);
+    }
+
+    function binStrToHexStr(binStr) {
+      return ensureLength(parseInt(binStr, 2).toString(16), 2).toUpperCase();
+    }
+
+    function ensureLength(str, len) {
+      while (str.length < len) {
+        str = '0' + str;
+      }
+
+      return str.toUpperCase();
+    }
+
+    function selectAll(eleID) {
+      var ele = document.getElementById(eleID);
+      ele.focus();
+      ele.select();
+    }
+  </script>
+
+  <script>
+    var allowBitCheckboxChangeEvent = true;
+    var allowPresetChangeEvent = true;
+
+    function applyDefaultClick(fuseName, defVal) {
+      var hexStr = ensureLength(defVal.toString(16), 2).toUpperCase();
+      document.getElementById("byte_" + fuseName + "_textbox").value = hexStr;
+      applyFuseTextbox(fuseName);
+    }
+
+    function applyFuseTextbox(fuseName) {
+      var textBox = document.getElementById("byte_" + fuseName + "_textbox");
+      var valSpan = document.getElementById("dudecmd_" + fuseName + "_val_span");
+
+      if (validateHexStr(textBox.value) == false) {
+        fuseTextboxBgColor(fuseName, false);
+
+        return;
+      }
+
+      fuseTextboxBgColor(fuseName, true);
+      var newTxtVal = ensureLength(textBox.value, 2);
+      if (newTxtVal != textBox.value) {
+        textBox.value = newTxtVal;
+      }
+
+      if (valSpan != null) {
+        valSpan.innerHTML = textBox.value;
+      }
+
+      var binStr = hexStrToBinStr(textBox.value);
+
+      allowBitCheckboxChangeEvent = false;
+
+      for (var i = 0; i < 8; i++) {
+        var chkBox = document.getElementById(fuseName + "_bit_" + i.toString(10));
+
+        if (binStr.charAt(7 - i) == '1') {
+          chkBox.checked = false;
+        }
+        else {
+          chkBox.checked = true;
+        }
+      }
+
+      allowBitCheckboxChangeEvent = true;
+      allowPresetChangeEvent = false;
+
+      for (var i = 0; i < 256; i++) {
+        var chkBox = document.getElementById("preset_" + fuseName + "_" + i.toString(10) + "_checkbox");
+        if (chkBox != null) {
+          if (matchMask(chkBox.value, binStr) == true) {
+            chkBox.checked = true;
+          }
+          else {
+            chkBox.checked = false;
+          }
+        }
+        else {
+          var dropDown = document.getElementById("preset_" + fuseName + "_" + i.toString(10) + "_dropdown");
+          if (dropDown == null) {
+            break;
+          }
+
+          for (var j = 0; j < dropDown.length; j++) {
+            if (matchMask(dropDown.options[j].value, binStr) == true) {
+              dropDown.selectedIndex = j;
+              break;
+            }
+          }
+        }
+      }
+
+      allowPresetChangeEvent = true;
+
+      //var hiddenEle = document.getElementById(fuseName).value = textBox.value;
+
+      setPermalink();
+    }
+
+    function applyCheckboxPreset(fuseName, eleID, maskStr) {
+      if (allowPresetChangeEvent == false) {
+        return;
+      }
+
+      var curValBinStr = checkBoxesToBinStr(fuseName);
+      var chkBox = document.getElementById("preset_" + fuseName + "_" + eleID + "_checkbox");
+      var newBinStr;
+
+      if (chkBox.checked == true) {
+        newBinStr = applyMask(maskStr, curValBinStr);
+      }
+      else {
+        newBinStr = unapplyMask(maskStr, curValBinStr);
+      }
+
+      var hexStr = binStrToHexStr(newBinStr);
+      var textBox = document.getElementById("byte_" + fuseName + "_textbox");
+      textBox.value = hexStr;
+      applyFuseTextbox(fuseName);
+    }
+
+    function applyDropdownPreset(fuseName, eleID) {
+      if (allowPresetChangeEvent == false) {
+        return;
+      }
+
+      var dropDown = document.getElementById("preset_" + fuseName + "_" + eleID + "_dropdown");
+      var maskStr = dropDown.value;
+      var curValBinStr = checkBoxesToBinStr(fuseName);
+      var newBinStr = applyMask(maskStr, curValBinStr);
+      var hexStr = binStrToHexStr(newBinStr);
+      var textBox = document.getElementById("byte_" + fuseName + "_textbox");
+      textBox.value = hexStr;
+      applyFuseTextbox(fuseName);
+    }
+
+    function applyCheckboxBits(fuseName, bitNum) {
+      if (allowBitCheckboxChangeEvent == false) {
+        return;
+      }
+
+      var textBox = document.getElementById("byte_" + fuseName + "_textbox");
+
+      var binStr = checkBoxesToBinStr(fuseName);
+
+      textBox.value = binStrToHexStr(binStr);
+
+      applyFuseTextbox(fuseName);
+    }
+
+    function checkBoxesToBinStr(fuseName) {
+      var binStr = "";
+      for (var i = 0; i < 8; i++) {
+        var chkBox = document.getElementById(fuseName + "_bit_" + i.toString(10));
+
+        if (chkBox.checked == false) {
+          binStr = '1' + binStr;
+        }
+        else {
+          binStr = '0' + binStr;
+        }
+      }
+
+      return binStr;
+    }
+
+    function validateHexStr(str) {
+      var validChars = "1234567890abcdefABCDEF";
+      for (var i = 0; i < str.length; i++) {
+        if (validChars.indexOf(str.charAt(i)) < 0) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function fuseTextboxBgColor(fuseName, isValid) {
+      var ele = document.getElementById("byte_" + fuseName + "_textbox");
+      if (isValid == false) {
+        ele.style.backgroundColor = "#FFCCCC";
+      }
+      else {
+        ele.style.backgroundColor = "#FFFFFF";
+      }
+    }
+
+    function getRequestStr() {
+      var res = String();
+      res = "";
+
+      for (var i = 0; i < 256; i++) {
+        var tblCell = document.getElementById("byte_table_fuse_label_" + i.toString(10) + "_cell");
+        if (tblCell == null) {
+          break;
+        }
+
+        res = res + "&" + tblCell.innerHTML + "=" + binStrToHexStr(checkBoxesToBinStr(tblCell.innerHTML));
+      }
+
+      return res;
+    }
+
+    function setPermalink() {
+      document.getElementById("permalink_textbox").value = getPermalink(document.getElementById("chip_nav_list").value);
+    }
+
+    function getPermalink(chipName) {
+      var fileLoc = location.href;
+      var dirLoc = fileLoc.substring(0, fileLoc.lastIndexOf('/') + 1);
+      var newLoc = dirLoc + "fusecalc.php?chip=" + chipName + getRequestStr();
+      return newLoc
+    }
+
+    function permaLinkClick() {
+      var ele = document.getElementById("permalink_textbox");
+
+      setPermalink();
+
+      ele.focus();
+      ele.select();
+    }
+
+    function bodyLoad() {
+      try { applyURLValues(); } catch (err) { }
+      setPermalink();
+    }
+  </script>
+
+  <script>
+    function naviToChip(chipName) {
+      var listEle = document.getElementById("chip_nav_list");
+      if (chipName == listEle.value) {
+        return;
+      }
+
+      var newChipName = listEle.value;
+
+      location.href = getPermalink(newChipName);
+    }
+  </script>
+  <style>
+    body {
+      font-family: Arial, Sans-Serif;
+      font-size: small;
+    }
+
+    div.chip_nav_div {
+      margin-top: 5px;
+      margin-left: 5px;
+      margin-bottom: 3px;
+      padding: 5px 5px 5px 10px;
+      border-width: 2px;
+      border-style: dotted;
+      border-color: Gray;
+      white-space: nowrap;
+    }
+
+    div.presetgroup_div {
+      margin-top: 5px;
+      margin-left: 5px;
+      margin-bottom: 3px;
+      padding: 5px 5px 5px 10px;
+      border-width: 2px;
+      border-color: Gray;
+      border-style: dotted;
+    }
+
+    div.byte_table_div {
+      margin-top: 5px;
+      margin-left: 5px;
+      padding: 5px 5px 5px 10px;
+      border-width: 2px;
+      border-color: Gray;
+      border-style: dotted;
+    }
+
+    div.help_div {
+      margin-top: 5px;
+      margin-left: 5px;
+      padding: 5px 5px 5px 10px;
+      border-width: 2px;
+      border-color: Gray;
+      border-style: dotted;
+    }
+
+    div.da_div_out {
+      padding: 5px 5px 5px 10px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+    }
+
+    div.da_div_in {
+      width: 365px;
+      height: 118px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+      border: solid 1px Gray;
+    }
+
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    td.presetgroup_fuse_id_cell {
+      background-color: #CCCCCC;
+      padding-top: 5px;
+      padding-left: 5px;
+      padding-bottom: 5px;
+    }
+
+    td.presetgroup_spacer_cell {
+      background-color: #EEEEEE;
+      height: 5px;
+    }
+
+    td.preset_cell {
+      background-color: #EEEEEE;
+    }
+
+    td.dudecmd_bad_cell {
+      background-color: #FF8888;
+      color: Black;
+      padding-left: 5px;
+    }
+
+    tr.dudecmd_row {
+      background-color: Black;
+      font-family: Courier New, Monospace;
+      color: White;
+    }
+
+    td.dudecmd_label_cell,
+    td.dudecmd_cell,
+    td.permalink_cell {
+      padding: 5px 5px 5px 5px;
+      white-space: nowrap;
+    }
+
+    td.byte_table_head_cell,
+    td.permalink_cell {
+      background-color: #EEEEEE;
+      padding-top: 5px;
+      padding-left: 5px;
+      padding-bottom: 5px;
+    }
+
+    td.permalink_label_cell {
+      padding-top: 5px;
+      padding-left: 5px;
+      padding-bottom: 5px;
+    }
+
+    tr.byte_table_label_row,
+    tr.byte_table_def_row,
+    td.permalink_label_cell {
+      background-color: #DDDDDD;
+    }
+
+    td.byte_table_bit_cell,
+    td.byte_table_label_cell,
+    td.byte_table_def_label_cell,
+    td.textbox_label_cell {
+      border-right: solid 2px Gray;
+    }
+
+    td.bit_checkbox_cell,
+    td.byte_table_fuse_label_cell,
+    td.byte_table_def_cell,
+    td.byte_textbox_cell {
+      border-left: solid 1px Gray;
+    }
+
+    td.byte_table_fuse_label_cell,
+    td.byte_table_label_cell,
+    td.byte_table_def_label_cell,
+    td.textbox_label_cell,
+    td.byte_textbox_cell,
+    td.permalink_label_cell,
+    td.permalink_cell {
+      padding-left: 5px;
+    }
+
+    td.byte_table_bit_cell {
+      padding-left: 10px;
+    }
+
+    tr.byte_table_bit_row:hover {
+      background-color: #EEEEEE;
+    }
+
+    input.permalink_textbox {
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+
+  <meta name="description"
+    content="A javascript web-based Atmel AVR microcontroller fuse calculator tool. Apply chip features to see fuse bit settings or apply fuse bit settings to match against known features." />
+  <meta name="keywords"
+    content="javascript, atmel, avr, microcontroller, micro, controller, microchip, chip, device, fuse, fusebit, bit, atmega, attiny, tinyavr, megaavr, xmega, avrdude, lfuse, efuse, hfuse, lockbit, at86rf401, at89s51, at89s52, at90can128, at90can32, at90can64, at90pwm2, at90pwm216, at90pwm2b, at90pwm3, at90pwm316, at90pwm3b, at90pwm81, at90s1200, at90s2313, at90s2323, at90s2343, at90s4414, at90s4433, at90s4434, at90s8515, at90s8515comp, at90s8535, at90s8535comp, at90scr100h, at90usb1286, at90usb1287, at90usb162, at90usb646, at90usb647, at90usb82, atmega103, atmega103comp, atmega128, atmega1280, atmega1281, atmega1284p, atmega128a, atmega128rfa1, atmega16, atmega161, atmega161comp, atmega162, atmega163, atmega164p, atmega164pa, atmega165, atmega165p, atmega165pa, atmega168, atmega168a, atmega168p, atmega168pa, atmega169, atmega169p, atmega169pa, atmega16a, atmega16hva, atmega16hva2, atmega16hvb, atmega16m1, atmega16u2, atmega16u4, atmega2560, atmega2561, atmega32, atmega323, atmega324p, atmega324pa, atmega325, atmega3250, atmega3250p, atmega325p, atmega328p, atmega329, atmega3290, atmega3290p, atmega329p, atmega329pa, atmega32a, atmega32c1, atmega32hvb, atmega32m1, atmega32u2, atmega32u4, atmega32u6, atmega406, atmega48, atmega48a, atmega48p, atmega48pa, atmega64, atmega640, atmega644, atmega644p, atmega644pa, atmega645, atmega6450, atmega649, atmega6490, atmega649p, atmega64a, atmega64c1, atmega64hve, atmega64m1, atmega8, atmega8515, atmega8535, atmega88, atmega88a, atmega88p, atmega88pa, atmega8a, atmega8hva, atmega8u2, attiny10, attiny11, attiny12, attiny13, attiny13a, attiny15, attiny167, attiny20, attiny22, attiny2313, attiny2313a, attiny24, attiny24a, attiny25, attiny26, attiny261, attiny261a, attiny28, attiny4, attiny40, attiny4313, attiny43u, attiny44, attiny44a, attiny45, attiny461, attiny461a, attiny48, attiny5, attiny84, attiny85, attiny861, attiny861a, attiny87, attiny88, attiny9, atxmega128a1, atxmega128a3, atxmega128d3, atxmega16a4, atxmega16d4, atxmega192a3, atxmega192d3, atxmega256a3, atxmega256a3b, atxmega256d3, atxmega32a4, atxmega32d4, atxmega64a1, atxmega64a3, atxmega64d3" />
+  <script language='javascript' type='text/javascript'>
+    function applyURLValues() {
+    }
+  </script>
+</head>
+
+<body onload="bodyLoad();">
+
+  <form class="calc_form" name="calc_form" id="calc_form" action="fusecalc.php" method="get" onsubmit="return false;">
+    <input type="hidden" name="chip" id="chip_form_chip" value="atmega32u4" /><input type="hidden" name="LOW" id="LOW"
+      value="41" /><input type="hidden" name="HIGH" id="HIGH" value="99" /><input type="hidden" name="EXTENDED"
+      id="EXTENDED" value="FF" /><input type="hidden" name="LOCKBIT" id="LOCKBIT" value="FF" />
+    <div class="presetgroup_div" id="presetgroup_div">
+      <table class="presetgroup_table" id="presetgroup_table">
+        <tr class="presetgroup_fuse_id_row">
+          <td class="presetgroup_fuse_id_cell">LOW Fuse Presets:</td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0100000000000000"
+              name="preset_LOW_0_checkbox" id="preset_LOW_0_checkbox" title="Clock output on PORTC7; [CKOUT=0]"
+              alt="Clock output on PORTC7; [CKOUT=0]" tabindex="2"
+              onchange="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              onclick="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              ondblclick="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              onfocus="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              onblur="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              onkeyup="applyCheckboxPreset('LOW', '0', '0100000000000000');"
+              onselect="applyCheckboxPreset('LOW', '0', '0100000000000000');" /><label for="preset_LOW_0_checkbox"
+              class="preset_checkbox_label" id="preset_LOW_0_checkbox_label"
+              title="Clock output on PORTC7; [CKOUT=0]">Clock output on PORTC7; [CKOUT=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="1000000000000000"
+              name="preset_LOW_1_checkbox" id="preset_LOW_1_checkbox" title="Divide clock by 8 internally; [CKDIV8=0]"
+              alt="Divide clock by 8 internally; [CKDIV8=0]" tabindex="3" checked="checked"
+              onchange="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              onclick="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              ondblclick="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              onfocus="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              onblur="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              onkeyup="applyCheckboxPreset('LOW', '1', '1000000000000000');"
+              onselect="applyCheckboxPreset('LOW', '1', '1000000000000000');" /><label for="preset_LOW_1_checkbox"
+              class="preset_checkbox_label" id="preset_LOW_1_checkbox_label"
+              title="Divide clock by 8 internally; [CKDIV8=0]">Divide clock by 8 internally; [CKDIV8=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_LOW_2_dropdown"
+              id="preset_LOW_2_dropdown" title="Preset Group for Mask: 0x3F" tabindex="4"
+              onchange="applyDropdownPreset('LOW', '2');" onclick="applyDropdownPreset('LOW', '2');"
+              ondblclick="applyDropdownPreset('LOW', '2');" onfocus="applyDropdownPreset('LOW', '2');"
+              onblur="applyDropdownPreset('LOW', '2');" onkeyup="applyDropdownPreset('LOW', '2');">
+              <option value="0011111100000000">Ext. Clock; Start-up time: 6 CK + 0 ms; [CKSEL=0000 SUT=00]</option>
+              <option value="0011111100010000">Ext. Clock; Start-up time: 6 CK + 4.1 ms; [CKSEL=0000 SUT=01]</option>
+              <option value="0011111100100000">Ext. Clock; Start-up time: 6 CK + 65 ms; [CKSEL=0000 SUT=10]</option>
+              <option value="0011111100011001">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 16K CK + 0 ms;
+                [CKSEL=1001 SUT=01]</option>
+              <option value="0011111100101001">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 16K CK + 4.1 ms;
+                [CKSEL=1001 SUT=10]</option>
+              <option value="0011111100111001">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 16K CK + 65 ms;
+                [CKSEL=1001 SUT=11]</option>
+              <option value="0011111100101000">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 1K CK + 0 ms;
+                [CKSEL=1000 SUT=10]</option>
+              <option value="0011111100111000">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 1K CK + 4.1 ms;
+                [CKSEL=1000 SUT=11]</option>
+              <option value="0011111100001001">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 1K CK + 65 ms;
+                [CKSEL=1001 SUT=00]</option>
+              <option value="0011111100001000">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 258 CK + 4.1 ms;
+                [CKSEL=1000 SUT=00]</option>
+              <option value="0011111100011000">Ext. Crystal Osc.; Frequency 0.4-0.9 MHz; Start-up time: 258 CK + 65 ms;
+                [CKSEL=1000 SUT=01]</option>
+              <option value="0011111100011011">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 16K CK + 0 ms;
+                [CKSEL=1011 SUT=01]</option>
+              <option value="0011111100101011">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 16K CK + 4.1 ms;
+                [CKSEL=1011 SUT=10]</option>
+              <option value="0011111100111011">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 16K CK + 65 ms;
+                [CKSEL=1011 SUT=11]</option>
+              <option value="0011111100101010">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 1K CK + 0 ms;
+                [CKSEL=1010 SUT=10]</option>
+              <option value="0011111100111010">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 1K CK + 4.1 ms;
+                [CKSEL=1010 SUT=11]</option>
+              <option value="0011111100001011">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 1K CK + 65 ms;
+                [CKSEL=1011 SUT=00]</option>
+              <option value="0011111100001010">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 258 CK + 4.1 ms;
+                [CKSEL=1010 SUT=00]</option>
+              <option value="0011111100011010">Ext. Crystal Osc.; Frequency 0.9-3.0 MHz; Start-up time: 258 CK + 65 ms;
+                [CKSEL=1010 SUT=01]</option>
+              <option value="0011111100011101">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 16K CK + 0 ms;
+                [CKSEL=1101 SUT=01]</option>
+              <option value="0011111100101101">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 16K CK + 4.1 ms;
+                [CKSEL=1101 SUT=10]</option>
+              <option value="0011111100111101">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 16K CK + 65 ms;
+                [CKSEL=1101 SUT=11]</option>
+              <option value="0011111100101100">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 1K CK + 0 ms;
+                [CKSEL=1100 SUT=10]</option>
+              <option value="0011111100111100">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 1K CK + 4.1 ms;
+                [CKSEL=1100 SUT=11]</option>
+              <option value="0011111100001101">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 1K CK + 65 ms;
+                [CKSEL=1101 SUT=00]</option>
+              <option value="0011111100001100">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 258 CK + 4.1 ms;
+                [CKSEL=1100 SUT=00]</option>
+              <option value="0011111100011100">Ext. Crystal Osc.; Frequency 3.0-8.0 MHz; Start-up time: 258 CK + 65 ms;
+                [CKSEL=1100 SUT=01]</option>
+              <option value="0011111100011111">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 16K CK + 0 ms;
+                [CKSEL=1111 SUT=01]</option>
+              <option value="0011111100101111">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 16K CK + 4.1 ms;
+                [CKSEL=1111 SUT=10]</option>
+              <option value="0011111100111111">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 16K CK + 65 ms;
+                [CKSEL=1111 SUT=11]</option>
+              <option value="0011111100101110">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 1K CK + 0 ms;
+                [CKSEL=1110 SUT=10]</option>
+              <option value="0011111100111110">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 1K CK + 4.1 ms;
+                [CKSEL=1110 SUT=11]</option>
+              <option value="0011111100001111">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 1K CK + 65 ms;
+                [CKSEL=1111 SUT=00]</option>
+              <option value="0011111100001110">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 258 CK + 4.1 ms;
+                [CKSEL=1110 SUT=00]</option>
+              <option value="0011111100011110">Ext. Crystal Osc.; Frequency 8.0- MHz; Start-up time: 258 CK + 65 ms;
+                [CKSEL=1110 SUT=01]</option>
+              <option value="0011111100000100">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 0 ms; [CKSEL=0100 SUT=00]
+              </option>
+              <option value="0011111100000110">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 0 ms; Int. Cap.;
+                [CKSEL=0110 SUT=00]</option>
+              <option value="0011111100010100">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 4.1 ms; [CKSEL=0100
+                SUT=01]</option>
+              <option value="0011111100010110">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 4.1 ms; Int. Cap.;
+                [CKSEL=0110 SUT=01]</option>
+              <option value="0011111100100100">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 65 ms; [CKSEL=0100 SUT=10]
+              </option>
+              <option value="0011111100100110">Ext. Low-Freq. Crystal; Start-up time: 1K CK + 65 ms; Int. Cap.;
+                [CKSEL=0110 SUT=10]</option>
+              <option value="0011111100000101">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 0 ms; [CKSEL=0101 SUT=00]
+              </option>
+              <option value="0011111100000111">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 0 ms; Int. Cap.;
+                [CKSEL=0111 SUT=00]</option>
+              <option value="0011111100010101">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 4.1 ms; [CKSEL=0101
+                SUT=01]</option>
+              <option value="0011111100010111">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 4.1 ms; Int. Cap.;
+                [CKSEL=0111 SUT=01]</option>
+              <option value="0011111100100101">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 65 ms; [CKSEL=0101
+                SUT=10]</option>
+              <option value="0011111100100111">Ext. Low-Freq. Crystal; Start-up time: 32K CK + 65 ms; Int. Cap.;
+                [CKSEL=0111 SUT=10]</option>
+              <option value="0011111100000010">Int. RC Osc.; Start-up time: 6 CK + 0 ms; [CKSEL=0010 SUT=00]</option>
+              <option value="0011111100010010">Int. RC Osc.; Start-up time: 6 CK + 4.1 ms; [CKSEL=0010 SUT=01]</option>
+              <option value="0011111100100010">Int. RC Osc.; Start-up time: 6 CK + 65 ms; [CKSEL=0010 SUT=10]</option>
+              <option value="0011111100000001" selected="selected">Undefined Preset 1: 0x01 0b00000001</option>
+              <option value="0011111100000011">Undefined Preset 2: 0x03 0b00000011</option>
+              <option value="0011111100010001">Undefined Preset 3: 0x11 0b00010001</option>
+              <option value="0011111100010011">Undefined Preset 4: 0x13 0b00010011</option>
+              <option value="0011111100100001">Undefined Preset 5: 0x21 0b00100001</option>
+              <option value="0011111100100011">Undefined Preset 6: 0x23 0b00100011</option>
+              <option value="0011111100110000">Undefined Preset 7: 0x30 0b00110000</option>
+              <option value="0011111100110001">Undefined Preset 8: 0x31 0b00110001</option>
+              <option value="0011111100110010">Undefined Preset 9: 0x32 0b00110010</option>
+              <option value="0011111100110011">Undefined Preset 10: 0x33 0b00110011</option>
+              <option value="0011111100110100">Undefined Preset 11: 0x34 0b00110100</option>
+              <option value="0011111100110101">Undefined Preset 12: 0x35 0b00110101</option>
+              <option value="0011111100110110">Undefined Preset 13: 0x36 0b00110110</option>
+              <option value="0011111100110111">Undefined Preset 14: 0x37 0b00110111</option>
+            </select></td>
+        </tr>
+        <tr class="presetgroup_spacer_row">
+          <td class="presetgroup_spacer_cell">&#x20;</td>
+        </tr>
+        <tr class="presetgroup_fuse_id_row">
+          <td class="presetgroup_fuse_id_cell">HIGH Fuse Presets:</td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_HIGH_0_dropdown"
+              id="preset_HIGH_0_dropdown" title="Preset Group for Mask: 0x06" tabindex="5"
+              onchange="applyDropdownPreset('HIGH', '0');" onclick="applyDropdownPreset('HIGH', '0');"
+              ondblclick="applyDropdownPreset('HIGH', '0');" onfocus="applyDropdownPreset('HIGH', '0');"
+              onblur="applyDropdownPreset('HIGH', '0');" onkeyup="applyDropdownPreset('HIGH', '0');">
+              <option value="0000011000000010">Boot Flash size=1024 words start address=$3C00; [BOOTSZ=01]</option>
+              <option value="0000011000000000" selected="selected">Boot Flash size=2048 words start address=$3800;
+                [BOOTSZ=00] ; default value</option>
+              <option value="0000011000000110">Boot Flash size=256 words start address=$3F00; [BOOTSZ=11]</option>
+              <option value="0000011000000100">Boot Flash size=512 words start address=$3E00; [BOOTSZ=10]</option>
+            </select></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0000000100000000"
+              name="preset_HIGH_1_checkbox" id="preset_HIGH_1_checkbox"
+              title="Boot Reset vector Enabled (default address=$0000); [BOOTRST=0]"
+              alt="Boot Reset vector Enabled (default address=$0000); [BOOTRST=0]" tabindex="6"
+              onchange="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              onclick="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              onfocus="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              onblur="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '1', '0000000100000000');"
+              onselect="applyCheckboxPreset('HIGH', '1', '0000000100000000');" /><label for="preset_HIGH_1_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_1_checkbox_label"
+              title="Boot Reset vector Enabled (default address=$0000); [BOOTRST=0]">Boot Reset vector Enabled (default
+              address=$0000); [BOOTRST=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0100000000000000"
+              name="preset_HIGH_2_checkbox" id="preset_HIGH_2_checkbox" title="JTAG Interface Enabled; [JTAGEN=0]"
+              alt="JTAG Interface Enabled; [JTAGEN=0]" tabindex="7" checked="checked"
+              onchange="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              onclick="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              onfocus="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              onblur="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '2', '0100000000000000');"
+              onselect="applyCheckboxPreset('HIGH', '2', '0100000000000000');" /><label for="preset_HIGH_2_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_2_checkbox_label"
+              title="JTAG Interface Enabled; [JTAGEN=0]">JTAG Interface Enabled; [JTAGEN=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="1000000000000000"
+              name="preset_HIGH_3_checkbox" id="preset_HIGH_3_checkbox" title="On-Chip Debug Enabled; [OCDEN=0]"
+              alt="On-Chip Debug Enabled; [OCDEN=0]" tabindex="8"
+              onchange="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              onclick="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              onfocus="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              onblur="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '3', '1000000000000000');"
+              onselect="applyCheckboxPreset('HIGH', '3', '1000000000000000');" /><label for="preset_HIGH_3_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_3_checkbox_label"
+              title="On-Chip Debug Enabled; [OCDEN=0]">On-Chip Debug Enabled; [OCDEN=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0000100000000000"
+              name="preset_HIGH_4_checkbox" id="preset_HIGH_4_checkbox"
+              title="Preserve EEPROM memory through the Chip Erase cycle; [EESAVE=0]"
+              alt="Preserve EEPROM memory through the Chip Erase cycle; [EESAVE=0]" tabindex="9"
+              onchange="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              onclick="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              onfocus="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              onblur="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '4', '0000100000000000');"
+              onselect="applyCheckboxPreset('HIGH', '4', '0000100000000000');" /><label for="preset_HIGH_4_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_4_checkbox_label"
+              title="Preserve EEPROM memory through the Chip Erase cycle; [EESAVE=0]">Preserve EEPROM memory through the
+              Chip Erase cycle; [EESAVE=0]</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0010000000000000"
+              name="preset_HIGH_5_checkbox" id="preset_HIGH_5_checkbox"
+              title="Serial program downloading (SPI) enabled; [SPIEN=0]"
+              alt="Serial program downloading (SPI) enabled; [SPIEN=0]" tabindex="10" checked="checked"
+              onchange="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              onclick="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              onfocus="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              onblur="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '5', '0010000000000000');"
+              onselect="applyCheckboxPreset('HIGH', '5', '0010000000000000');" /><label for="preset_HIGH_5_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_5_checkbox_label"
+              title="Serial program downloading (SPI) enabled; [SPIEN=0]">Serial program downloading (SPI) enabled;
+              [SPIEN=0] *</label></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0001000000000000"
+              name="preset_HIGH_6_checkbox" id="preset_HIGH_6_checkbox" title="Watchdog timer always on; [WDTON=0]"
+              alt="Watchdog timer always on; [WDTON=0]" tabindex="11"
+              onchange="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              onclick="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              ondblclick="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              onfocus="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              onblur="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              onkeyup="applyCheckboxPreset('HIGH', '6', '0001000000000000');"
+              onselect="applyCheckboxPreset('HIGH', '6', '0001000000000000');" /><label for="preset_HIGH_6_checkbox"
+              class="preset_checkbox_label" id="preset_HIGH_6_checkbox_label"
+              title="Watchdog timer always on; [WDTON=0]">Watchdog timer always on; [WDTON=0]</label></td>
+        </tr>
+        <tr class="presetgroup_spacer_row">
+          <td class="presetgroup_spacer_cell">&#x20;</td>
+        </tr>
+        <tr class="presetgroup_fuse_id_row">
+          <td class="presetgroup_fuse_id_cell">EXTENDED Fuse Presets:</td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_EXTENDED_0_dropdown"
+              id="preset_EXTENDED_0_dropdown" title="Preset Group for Mask: 0x07" tabindex="12"
+              onchange="applyDropdownPreset('EXTENDED', '0');" onclick="applyDropdownPreset('EXTENDED', '0');"
+              ondblclick="applyDropdownPreset('EXTENDED', '0');" onfocus="applyDropdownPreset('EXTENDED', '0');"
+              onblur="applyDropdownPreset('EXTENDED', '0');" onkeyup="applyDropdownPreset('EXTENDED', '0');">
+              <option value="0000011100000111" selected="selected">Brown-out detection disabled; [BODLEVEL=111]</option>
+              <option value="0000011100000110">Brown-out detection level at VCC=2.0 V; [BODLEVEL=110]</option>
+              <option value="0000011100000101">Brown-out detection level at VCC=2.2 V; [BODLEVEL=101]</option>
+              <option value="0000011100000100">Brown-out detection level at VCC=2.4 V; [BODLEVEL=100]</option>
+              <option value="0000011100000011">Brown-out detection level at VCC=2.6 V; [BODLEVEL=011]</option>
+              <option value="0000011100000010">Brown-out detection level at VCC=3.4 V; [BODLEVEL=010]</option>
+              <option value="0000011100000001">Brown-out detection level at VCC=3.5 V; [BODLEVEL=011]</option>
+              <option value="0000011100000000">Brown-out detection level at VCC=4.3 V; [BODLEVEL=000]</option>
+            </select></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><input class="preset_checkbox" type="checkbox" value="0000100000000000"
+              name="preset_EXTENDED_1_checkbox" id="preset_EXTENDED_1_checkbox" title="Hardware Boot Enable; [HWBE=0]"
+              alt="Hardware Boot Enable; [HWBE=0]" tabindex="13"
+              onchange="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              onclick="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              ondblclick="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              onfocus="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              onblur="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              onkeyup="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');"
+              onselect="applyCheckboxPreset('EXTENDED', '1', '0000100000000000');" /><label
+              for="preset_EXTENDED_1_checkbox" class="preset_checkbox_label" id="preset_EXTENDED_1_checkbox_label"
+              title="Hardware Boot Enable; [HWBE=0]">Hardware Boot Enable; [HWBE=0]</label></td>
+        </tr>
+        <tr class="presetgroup_spacer_row">
+          <td class="presetgroup_spacer_cell">&#x20;</td>
+        </tr>
+        <tr class="presetgroup_fuse_id_row">
+          <td class="presetgroup_fuse_id_cell">LOCKBIT Fuse Presets:</td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_LOCKBIT_0_dropdown"
+              id="preset_LOCKBIT_0_dropdown" title="Preset Group for Mask: 0x0C" tabindex="14"
+              onchange="applyDropdownPreset('LOCKBIT', '0');" onclick="applyDropdownPreset('LOCKBIT', '0');"
+              ondblclick="applyDropdownPreset('LOCKBIT', '0');" onfocus="applyDropdownPreset('LOCKBIT', '0');"
+              onblur="applyDropdownPreset('LOCKBIT', '0');" onkeyup="applyDropdownPreset('LOCKBIT', '0');">
+              <option value="0000110000001100" selected="selected">Application Protection Mode 1: No lock on SPM and LPM
+                in Application Section</option>
+              <option value="0000110000001000">Application Protection Mode 2: SPM prohibited in Application Section
+              </option>
+              <option value="0000110000000000">Application Protection Mode 3: LPM and SPM prohibited in Application
+                Section</option>
+              <option value="0000110000000100">Application Protection Mode 4: LPM prohibited in Application Section
+              </option>
+            </select></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_LOCKBIT_1_dropdown"
+              id="preset_LOCKBIT_1_dropdown" title="Preset Group for Mask: 0x30" tabindex="15"
+              onchange="applyDropdownPreset('LOCKBIT', '1');" onclick="applyDropdownPreset('LOCKBIT', '1');"
+              ondblclick="applyDropdownPreset('LOCKBIT', '1');" onfocus="applyDropdownPreset('LOCKBIT', '1');"
+              onblur="applyDropdownPreset('LOCKBIT', '1');" onkeyup="applyDropdownPreset('LOCKBIT', '1');">
+              <option value="0011000000110000" selected="selected">Boot Loader Protection Mode 1: No lock on SPM and LPM
+                in Boot Loader Section</option>
+              <option value="0011000000100000">Boot Loader Protection Mode 2: SPM prohibited in Boot Loader Section
+              </option>
+              <option value="0011000000000000">Boot Loader Protection Mode 3: LPM and SPM prohibited in Boot Loader
+                Section</option>
+              <option value="0011000000010000">Boot Loader Protection Mode 4: LPM prohibited in Boot Loader Section
+              </option>
+            </select></td>
+        </tr>
+        <tr class="preset_row">
+          <td class="preset_cell"><select class="preset_dropdown" name="preset_LOCKBIT_2_dropdown"
+              id="preset_LOCKBIT_2_dropdown" title="Preset Group for Mask: 0x03" tabindex="16"
+              onchange="applyDropdownPreset('LOCKBIT', '2');" onclick="applyDropdownPreset('LOCKBIT', '2');"
+              ondblclick="applyDropdownPreset('LOCKBIT', '2');" onfocus="applyDropdownPreset('LOCKBIT', '2');"
+              onblur="applyDropdownPreset('LOCKBIT', '2');" onkeyup="applyDropdownPreset('LOCKBIT', '2');">
+              <option value="0000001100000011" selected="selected">Mode 1: No memory lock features enabled</option>
+              <option value="0000001100000010">Mode 2: Further programming disabled</option>
+              <option value="0000001100000000">Mode 3: Further programming and verification disabled</option>
+              <option value="0000001100000001">Undefined Preset 1: 0x01 0b00000001</option>
+            </select></td>
+        </tr>
+        <tr class="presetgroup_spacer_row">
+          <td class="presetgroup_spacer_cell">&#x20;</td>
+        </tr>
+      </table>
+    </div>
+    <div class="byte_table_div" id="byte_table_div">
+      <table class="byte_table" id="byte_table">
+        <tr class="byte_table_head_row" id="byte_table_head_row">
+          <td class="byte_table_head_cell" id="byte_table_head_cell" colspan="5">Manual Fuse Bit
+            Manipulation<br />Remember: <input class="example_checked_checkbox" type="checkbox"
+              name="example_checked_checkbox" id="example_checked_checkbox" title="checked = programmed = 0"
+              alt="checked = programmed = 0" checked="checked" disabled="disabled" /><label
+              for="example_checked_checkbox" class="example_checked_checkbox_label" id="example_checked_checkbox_label"
+              title="checked = programmed = 0">= programmed = 0</label>; <input class="example_unchecked_checkbox"
+              type="checkbox" name="example_unchecked_checkbox" id="example_unchecked_checkbox"
+              title="unchecked = unprogrammed = 1" alt="unchecked = unprogrammed = 1" disabled="disabled" /><label
+              for="example_unchecked_checkbox" class="example_unchecked_checkbox_label"
+              id="example_unchecked_checkbox_label" title="unchecked = unprogrammed = 1">= unprogrammed = 1</label></td>
+        </tr>
+        <tr class="byte_table_label_row" id="byte_table_label_row">
+          <td class="byte_table_label_cell" id="byte_table_label_cell">Bit</td>
+          <td class="byte_table_fuse_label_cell" id="byte_table_fuse_label_0_cell">LOW</td>
+          <td class="byte_table_fuse_label_cell" id="byte_table_fuse_label_1_cell">HIGH</td>
+          <td class="byte_table_fuse_label_cell" id="byte_table_fuse_label_2_cell">EXTENDED</td>
+          <td class="byte_table_fuse_label_cell" id="byte_table_fuse_label_3_cell">LOCKBIT</td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">7</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="7" name="LOW_bit_7"
+              id="LOW_bit_7" title="CKDIV8: Divide clock by 8 (Default: 0)" alt="CKDIV8: Divide clock by 8 (Default: 0)"
+              tabindex="19" checked="checked" onchange="applyCheckboxBits('LOW', 7);"
+              onclick="applyCheckboxBits('LOW', 7);" ondblclick="applyCheckboxBits('LOW', 7);"
+              onfocus="applyCheckboxBits('LOW', 7);" onblur="applyCheckboxBits('LOW', 7);"
+              onkeyup="applyCheckboxBits('LOW', 7);" onselect="applyCheckboxBits('LOW', 7);" /><label for="LOW_bit_7"
+              class="bit_checkbox_label" id="LOW_bit_7_label"
+              title="CKDIV8: Divide clock by 8 (Default: 0)">CKDIV8</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="7" name="HIGH_bit_7"
+              id="HIGH_bit_7" title="OCDEN: Enable OCD (Default: 1)" alt="OCDEN: Enable OCD (Default: 1)" tabindex="27"
+              onchange="applyCheckboxBits('HIGH', 7);" onclick="applyCheckboxBits('HIGH', 7);"
+              ondblclick="applyCheckboxBits('HIGH', 7);" onfocus="applyCheckboxBits('HIGH', 7);"
+              onblur="applyCheckboxBits('HIGH', 7);" onkeyup="applyCheckboxBits('HIGH', 7);"
+              onselect="applyCheckboxBits('HIGH', 7);" /><label for="HIGH_bit_7" class="bit_checkbox_label"
+              id="HIGH_bit_7_label" title="OCDEN: Enable OCD (Default: 1)">OCDEN</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="7" name="EXTENDED_bit_7"
+              id="EXTENDED_bit_7" title="Bit 7: (Default: 1)" alt="Bit 7: (Default: 1)" tabindex="35"
+              disabled="disabled" /><label for="EXTENDED_bit_7" class="bit_checkbox_label" id="EXTENDED_bit_7_label"
+              title="Bit 7: (Default: 1)">Bit 7</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="7" name="LOCKBIT_bit_7"
+              id="LOCKBIT_bit_7" title="Bit 7: (Default: 1)" alt="Bit 7: (Default: 1)" tabindex="43"
+              disabled="disabled" /><label for="LOCKBIT_bit_7" class="bit_checkbox_label" id="LOCKBIT_bit_7_label"
+              title="Bit 7: (Default: 1)">Bit 7</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">6</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="6" name="LOW_bit_6"
+              id="LOW_bit_6" title="CKOUT: Oscillator options (Default: 1)" alt="CKOUT: Oscillator options (Default: 1)"
+              tabindex="20" onchange="applyCheckboxBits('LOW', 6);" onclick="applyCheckboxBits('LOW', 6);"
+              ondblclick="applyCheckboxBits('LOW', 6);" onfocus="applyCheckboxBits('LOW', 6);"
+              onblur="applyCheckboxBits('LOW', 6);" onkeyup="applyCheckboxBits('LOW', 6);"
+              onselect="applyCheckboxBits('LOW', 6);" /><label for="LOW_bit_6" class="bit_checkbox_label"
+              id="LOW_bit_6_label" title="CKOUT: Oscillator options (Default: 1)">CKOUT</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="6" name="HIGH_bit_6"
+              id="HIGH_bit_6" title="JTAGEN: Enable JTAG (Default: 0)" alt="JTAGEN: Enable JTAG (Default: 0)"
+              tabindex="28" checked="checked" onchange="applyCheckboxBits('HIGH', 6);"
+              onclick="applyCheckboxBits('HIGH', 6);" ondblclick="applyCheckboxBits('HIGH', 6);"
+              onfocus="applyCheckboxBits('HIGH', 6);" onblur="applyCheckboxBits('HIGH', 6);"
+              onkeyup="applyCheckboxBits('HIGH', 6);" onselect="applyCheckboxBits('HIGH', 6);" /><label for="HIGH_bit_6"
+              class="bit_checkbox_label" id="HIGH_bit_6_label" title="JTAGEN: Enable JTAG (Default: 0)">JTAGEN</label>
+          </td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="6" name="EXTENDED_bit_6"
+              id="EXTENDED_bit_6" title="Bit 6: (Default: 1)" alt="Bit 6: (Default: 1)" tabindex="36"
+              disabled="disabled" /><label for="EXTENDED_bit_6" class="bit_checkbox_label" id="EXTENDED_bit_6_label"
+              title="Bit 6: (Default: 1)">Bit 6</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="6" name="LOCKBIT_bit_6"
+              id="LOCKBIT_bit_6" title="Bit 6: (Default: 1)" alt="Bit 6: (Default: 1)" tabindex="44"
+              disabled="disabled" /><label for="LOCKBIT_bit_6" class="bit_checkbox_label" id="LOCKBIT_bit_6_label"
+              title="Bit 6: (Default: 1)">Bit 6</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">5</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="5" name="LOW_bit_5"
+              id="LOW_bit_5" title="SUT1: Select start-up time (Default: 0)"
+              alt="SUT1: Select start-up time (Default: 0)" tabindex="21" checked="checked"
+              onchange="applyCheckboxBits('LOW', 5);" onclick="applyCheckboxBits('LOW', 5);"
+              ondblclick="applyCheckboxBits('LOW', 5);" onfocus="applyCheckboxBits('LOW', 5);"
+              onblur="applyCheckboxBits('LOW', 5);" onkeyup="applyCheckboxBits('LOW', 5);"
+              onselect="applyCheckboxBits('LOW', 5);" /><label for="LOW_bit_5" class="bit_checkbox_label"
+              id="LOW_bit_5_label" title="SUT1: Select start-up time (Default: 0)">SUT1</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="5" name="HIGH_bit_5"
+              id="HIGH_bit_5" title="SPIEN: Enable Serial programming and Data Downloading (Default: 0)"
+              alt="SPIEN: Enable Serial programming and Data Downloading (Default: 0)" tabindex="29" checked="checked"
+              onchange="applyCheckboxBits('HIGH', 5);" onclick="applyCheckboxBits('HIGH', 5);"
+              ondblclick="applyCheckboxBits('HIGH', 5);" onfocus="applyCheckboxBits('HIGH', 5);"
+              onblur="applyCheckboxBits('HIGH', 5);" onkeyup="applyCheckboxBits('HIGH', 5);"
+              onselect="applyCheckboxBits('HIGH', 5);" /><label for="HIGH_bit_5" class="bit_checkbox_label"
+              id="HIGH_bit_5_label" title="SPIEN: Enable Serial programming and Data Downloading (Default: 0)">SPIEN
+              *</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="5" name="EXTENDED_bit_5"
+              id="EXTENDED_bit_5" title="Bit 5: (Default: 1)" alt="Bit 5: (Default: 1)" tabindex="37"
+              disabled="disabled" /><label for="EXTENDED_bit_5" class="bit_checkbox_label" id="EXTENDED_bit_5_label"
+              title="Bit 5: (Default: 1)">Bit 5</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="5" name="LOCKBIT_bit_5"
+              id="LOCKBIT_bit_5" title="Bit 5: (Default: 1)" alt="Bit 5: (Default: 1)" tabindex="45"
+              onchange="applyCheckboxBits('LOCKBIT', 5);" onclick="applyCheckboxBits('LOCKBIT', 5);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 5);" onfocus="applyCheckboxBits('LOCKBIT', 5);"
+              onblur="applyCheckboxBits('LOCKBIT', 5);" onkeyup="applyCheckboxBits('LOCKBIT', 5);"
+              onselect="applyCheckboxBits('LOCKBIT', 5);" /><label for="LOCKBIT_bit_5" class="bit_checkbox_label"
+              id="LOCKBIT_bit_5_label" title="Bit 5: (Default: 1)">Bit 5</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">4</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="4" name="LOW_bit_4"
+              id="LOW_bit_4" title="SUT0: Select start-up time (Default: 0)"
+              alt="SUT0: Select start-up time (Default: 0)" tabindex="22" checked="checked"
+              onchange="applyCheckboxBits('LOW', 4);" onclick="applyCheckboxBits('LOW', 4);"
+              ondblclick="applyCheckboxBits('LOW', 4);" onfocus="applyCheckboxBits('LOW', 4);"
+              onblur="applyCheckboxBits('LOW', 4);" onkeyup="applyCheckboxBits('LOW', 4);"
+              onselect="applyCheckboxBits('LOW', 4);" /><label for="LOW_bit_4" class="bit_checkbox_label"
+              id="LOW_bit_4_label" title="SUT0: Select start-up time (Default: 0)">SUT0</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="4" name="HIGH_bit_4"
+              id="HIGH_bit_4" title="WDTON: Watchdog timer always on (Default: 1)"
+              alt="WDTON: Watchdog timer always on (Default: 1)" tabindex="30" onchange="applyCheckboxBits('HIGH', 4);"
+              onclick="applyCheckboxBits('HIGH', 4);" ondblclick="applyCheckboxBits('HIGH', 4);"
+              onfocus="applyCheckboxBits('HIGH', 4);" onblur="applyCheckboxBits('HIGH', 4);"
+              onkeyup="applyCheckboxBits('HIGH', 4);" onselect="applyCheckboxBits('HIGH', 4);" /><label for="HIGH_bit_4"
+              class="bit_checkbox_label" id="HIGH_bit_4_label"
+              title="WDTON: Watchdog timer always on (Default: 1)">WDTON</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="4" name="EXTENDED_bit_4"
+              id="EXTENDED_bit_4" title="Bit 4: (Default: 1)" alt="Bit 4: (Default: 1)" tabindex="38"
+              disabled="disabled" /><label for="EXTENDED_bit_4" class="bit_checkbox_label" id="EXTENDED_bit_4_label"
+              title="Bit 4: (Default: 1)">Bit 4</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="4" name="LOCKBIT_bit_4"
+              id="LOCKBIT_bit_4" title="Bit 4: (Default: 1)" alt="Bit 4: (Default: 1)" tabindex="46"
+              onchange="applyCheckboxBits('LOCKBIT', 4);" onclick="applyCheckboxBits('LOCKBIT', 4);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 4);" onfocus="applyCheckboxBits('LOCKBIT', 4);"
+              onblur="applyCheckboxBits('LOCKBIT', 4);" onkeyup="applyCheckboxBits('LOCKBIT', 4);"
+              onselect="applyCheckboxBits('LOCKBIT', 4);" /><label for="LOCKBIT_bit_4" class="bit_checkbox_label"
+              id="LOCKBIT_bit_4_label" title="Bit 4: (Default: 1)">Bit 4</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">3</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="3" name="LOW_bit_3"
+              id="LOW_bit_3" title="CKSEL3: Select Clock Source (Default: 0)"
+              alt="CKSEL3: Select Clock Source (Default: 0)" tabindex="23" checked="checked"
+              onchange="applyCheckboxBits('LOW', 3);" onclick="applyCheckboxBits('LOW', 3);"
+              ondblclick="applyCheckboxBits('LOW', 3);" onfocus="applyCheckboxBits('LOW', 3);"
+              onblur="applyCheckboxBits('LOW', 3);" onkeyup="applyCheckboxBits('LOW', 3);"
+              onselect="applyCheckboxBits('LOW', 3);" /><label for="LOW_bit_3" class="bit_checkbox_label"
+              id="LOW_bit_3_label" title="CKSEL3: Select Clock Source (Default: 0)">CKSEL3</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="3" name="HIGH_bit_3"
+              id="HIGH_bit_3" title="EESAVE: EEPROM memory is preserved through chip erase (Default: 1)"
+              alt="EESAVE: EEPROM memory is preserved through chip erase (Default: 1)" tabindex="31"
+              onchange="applyCheckboxBits('HIGH', 3);" onclick="applyCheckboxBits('HIGH', 3);"
+              ondblclick="applyCheckboxBits('HIGH', 3);" onfocus="applyCheckboxBits('HIGH', 3);"
+              onblur="applyCheckboxBits('HIGH', 3);" onkeyup="applyCheckboxBits('HIGH', 3);"
+              onselect="applyCheckboxBits('HIGH', 3);" /><label for="HIGH_bit_3" class="bit_checkbox_label"
+              id="HIGH_bit_3_label"
+              title="EESAVE: EEPROM memory is preserved through chip erase (Default: 1)">EESAVE</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="3" name="EXTENDED_bit_3"
+              id="EXTENDED_bit_3" title="HWBE: Hardware Boot Enable (Default: 1)"
+              alt="HWBE: Hardware Boot Enable (Default: 1)" tabindex="39" onchange="applyCheckboxBits('EXTENDED', 3);"
+              onclick="applyCheckboxBits('EXTENDED', 3);" ondblclick="applyCheckboxBits('EXTENDED', 3);"
+              onfocus="applyCheckboxBits('EXTENDED', 3);" onblur="applyCheckboxBits('EXTENDED', 3);"
+              onkeyup="applyCheckboxBits('EXTENDED', 3);" onselect="applyCheckboxBits('EXTENDED', 3);" /><label
+              for="EXTENDED_bit_3" class="bit_checkbox_label" id="EXTENDED_bit_3_label"
+              title="HWBE: Hardware Boot Enable (Default: 1)">HWBE</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="3" name="LOCKBIT_bit_3"
+              id="LOCKBIT_bit_3" title="Bit 3: (Default: 1)" alt="Bit 3: (Default: 1)" tabindex="47"
+              onchange="applyCheckboxBits('LOCKBIT', 3);" onclick="applyCheckboxBits('LOCKBIT', 3);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 3);" onfocus="applyCheckboxBits('LOCKBIT', 3);"
+              onblur="applyCheckboxBits('LOCKBIT', 3);" onkeyup="applyCheckboxBits('LOCKBIT', 3);"
+              onselect="applyCheckboxBits('LOCKBIT', 3);" /><label for="LOCKBIT_bit_3" class="bit_checkbox_label"
+              id="LOCKBIT_bit_3_label" title="Bit 3: (Default: 1)">Bit 3</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">2</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="2" name="LOW_bit_2"
+              id="LOW_bit_2" title="CKSEL2: Select Clock Source (Default: 0)"
+              alt="CKSEL2: Select Clock Source (Default: 0)" tabindex="24" checked="checked"
+              onchange="applyCheckboxBits('LOW', 2);" onclick="applyCheckboxBits('LOW', 2);"
+              ondblclick="applyCheckboxBits('LOW', 2);" onfocus="applyCheckboxBits('LOW', 2);"
+              onblur="applyCheckboxBits('LOW', 2);" onkeyup="applyCheckboxBits('LOW', 2);"
+              onselect="applyCheckboxBits('LOW', 2);" /><label for="LOW_bit_2" class="bit_checkbox_label"
+              id="LOW_bit_2_label" title="CKSEL2: Select Clock Source (Default: 0)">CKSEL2</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="2" name="HIGH_bit_2"
+              id="HIGH_bit_2" title="BOOTSZ1: Select Boot Size (Default: 0)"
+              alt="BOOTSZ1: Select Boot Size (Default: 0)" tabindex="32" checked="checked"
+              onchange="applyCheckboxBits('HIGH', 2);" onclick="applyCheckboxBits('HIGH', 2);"
+              ondblclick="applyCheckboxBits('HIGH', 2);" onfocus="applyCheckboxBits('HIGH', 2);"
+              onblur="applyCheckboxBits('HIGH', 2);" onkeyup="applyCheckboxBits('HIGH', 2);"
+              onselect="applyCheckboxBits('HIGH', 2);" /><label for="HIGH_bit_2" class="bit_checkbox_label"
+              id="HIGH_bit_2_label" title="BOOTSZ1: Select Boot Size (Default: 0)">BOOTSZ1</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="2" name="EXTENDED_bit_2"
+              id="EXTENDED_bit_2" title="BODLEVEL2: Brown-out Detector trigger level (Default: 1)"
+              alt="BODLEVEL2: Brown-out Detector trigger level (Default: 1)" tabindex="40"
+              onchange="applyCheckboxBits('EXTENDED', 2);" onclick="applyCheckboxBits('EXTENDED', 2);"
+              ondblclick="applyCheckboxBits('EXTENDED', 2);" onfocus="applyCheckboxBits('EXTENDED', 2);"
+              onblur="applyCheckboxBits('EXTENDED', 2);" onkeyup="applyCheckboxBits('EXTENDED', 2);"
+              onselect="applyCheckboxBits('EXTENDED', 2);" /><label for="EXTENDED_bit_2" class="bit_checkbox_label"
+              id="EXTENDED_bit_2_label"
+              title="BODLEVEL2: Brown-out Detector trigger level (Default: 1)">BODLEVEL2</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="2" name="LOCKBIT_bit_2"
+              id="LOCKBIT_bit_2" title="Bit 2: (Default: 1)" alt="Bit 2: (Default: 1)" tabindex="48"
+              onchange="applyCheckboxBits('LOCKBIT', 2);" onclick="applyCheckboxBits('LOCKBIT', 2);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 2);" onfocus="applyCheckboxBits('LOCKBIT', 2);"
+              onblur="applyCheckboxBits('LOCKBIT', 2);" onkeyup="applyCheckboxBits('LOCKBIT', 2);"
+              onselect="applyCheckboxBits('LOCKBIT', 2);" /><label for="LOCKBIT_bit_2" class="bit_checkbox_label"
+              id="LOCKBIT_bit_2_label" title="Bit 2: (Default: 1)">Bit 2</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">1</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="1" name="LOW_bit_1"
+              id="LOW_bit_1" title="CKSEL1: Select Clock Source (Default: 0)"
+              alt="CKSEL1: Select Clock Source (Default: 0)" tabindex="25" checked="checked"
+              onchange="applyCheckboxBits('LOW', 1);" onclick="applyCheckboxBits('LOW', 1);"
+              ondblclick="applyCheckboxBits('LOW', 1);" onfocus="applyCheckboxBits('LOW', 1);"
+              onblur="applyCheckboxBits('LOW', 1);" onkeyup="applyCheckboxBits('LOW', 1);"
+              onselect="applyCheckboxBits('LOW', 1);" /><label for="LOW_bit_1" class="bit_checkbox_label"
+              id="LOW_bit_1_label" title="CKSEL1: Select Clock Source (Default: 0)">CKSEL1</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="1" name="HIGH_bit_1"
+              id="HIGH_bit_1" title="BOOTSZ0: Select Boot Size (Default: 0)"
+              alt="BOOTSZ0: Select Boot Size (Default: 0)" tabindex="33" checked="checked"
+              onchange="applyCheckboxBits('HIGH', 1);" onclick="applyCheckboxBits('HIGH', 1);"
+              ondblclick="applyCheckboxBits('HIGH', 1);" onfocus="applyCheckboxBits('HIGH', 1);"
+              onblur="applyCheckboxBits('HIGH', 1);" onkeyup="applyCheckboxBits('HIGH', 1);"
+              onselect="applyCheckboxBits('HIGH', 1);" /><label for="HIGH_bit_1" class="bit_checkbox_label"
+              id="HIGH_bit_1_label" title="BOOTSZ0: Select Boot Size (Default: 0)">BOOTSZ0</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="1" name="EXTENDED_bit_1"
+              id="EXTENDED_bit_1" title="BODLEVEL1: Brown-out Detector trigger level (Default: 1)"
+              alt="BODLEVEL1: Brown-out Detector trigger level (Default: 1)" tabindex="41"
+              onchange="applyCheckboxBits('EXTENDED', 1);" onclick="applyCheckboxBits('EXTENDED', 1);"
+              ondblclick="applyCheckboxBits('EXTENDED', 1);" onfocus="applyCheckboxBits('EXTENDED', 1);"
+              onblur="applyCheckboxBits('EXTENDED', 1);" onkeyup="applyCheckboxBits('EXTENDED', 1);"
+              onselect="applyCheckboxBits('EXTENDED', 1);" /><label for="EXTENDED_bit_1" class="bit_checkbox_label"
+              id="EXTENDED_bit_1_label"
+              title="BODLEVEL1: Brown-out Detector trigger level (Default: 1)">BODLEVEL1</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="1" name="LOCKBIT_bit_1"
+              id="LOCKBIT_bit_1" title="Bit 1: (Default: 1)" alt="Bit 1: (Default: 1)" tabindex="49"
+              onchange="applyCheckboxBits('LOCKBIT', 1);" onclick="applyCheckboxBits('LOCKBIT', 1);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 1);" onfocus="applyCheckboxBits('LOCKBIT', 1);"
+              onblur="applyCheckboxBits('LOCKBIT', 1);" onkeyup="applyCheckboxBits('LOCKBIT', 1);"
+              onselect="applyCheckboxBits('LOCKBIT', 1);" /><label for="LOCKBIT_bit_1" class="bit_checkbox_label"
+              id="LOCKBIT_bit_1_label" title="Bit 1: (Default: 1)">Bit 1</label></td>
+        </tr>
+        <tr class="byte_table_bit_row">
+          <td class="byte_table_bit_cell">0</td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="0" name="LOW_bit_0"
+              id="LOW_bit_0" title="CKSEL0: Select Clock Source (Default: 1)"
+              alt="CKSEL0: Select Clock Source (Default: 1)" tabindex="26" onchange="applyCheckboxBits('LOW', 0);"
+              onclick="applyCheckboxBits('LOW', 0);" ondblclick="applyCheckboxBits('LOW', 0);"
+              onfocus="applyCheckboxBits('LOW', 0);" onblur="applyCheckboxBits('LOW', 0);"
+              onkeyup="applyCheckboxBits('LOW', 0);" onselect="applyCheckboxBits('LOW', 0);" /><label for="LOW_bit_0"
+              class="bit_checkbox_label" id="LOW_bit_0_label"
+              title="CKSEL0: Select Clock Source (Default: 1)">CKSEL0</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="0" name="HIGH_bit_0"
+              id="HIGH_bit_0" title="BOOTRST: Select Reset Vector (Default: 1)"
+              alt="BOOTRST: Select Reset Vector (Default: 1)" tabindex="34" onchange="applyCheckboxBits('HIGH', 0);"
+              onclick="applyCheckboxBits('HIGH', 0);" ondblclick="applyCheckboxBits('HIGH', 0);"
+              onfocus="applyCheckboxBits('HIGH', 0);" onblur="applyCheckboxBits('HIGH', 0);"
+              onkeyup="applyCheckboxBits('HIGH', 0);" onselect="applyCheckboxBits('HIGH', 0);" /><label for="HIGH_bit_0"
+              class="bit_checkbox_label" id="HIGH_bit_0_label"
+              title="BOOTRST: Select Reset Vector (Default: 1)">BOOTRST</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="0" name="EXTENDED_bit_0"
+              id="EXTENDED_bit_0" title="BODLEVEL0: Brown-out Detector trigger level (Default: 1)"
+              alt="BODLEVEL0: Brown-out Detector trigger level (Default: 1)" tabindex="42"
+              onchange="applyCheckboxBits('EXTENDED', 0);" onclick="applyCheckboxBits('EXTENDED', 0);"
+              ondblclick="applyCheckboxBits('EXTENDED', 0);" onfocus="applyCheckboxBits('EXTENDED', 0);"
+              onblur="applyCheckboxBits('EXTENDED', 0);" onkeyup="applyCheckboxBits('EXTENDED', 0);"
+              onselect="applyCheckboxBits('EXTENDED', 0);" /><label for="EXTENDED_bit_0" class="bit_checkbox_label"
+              id="EXTENDED_bit_0_label"
+              title="BODLEVEL0: Brown-out Detector trigger level (Default: 1)">BODLEVEL0</label></td>
+          <td class="bit_checkbox_cell"><input class="bit_checkbox" type="checkbox" value="0" name="LOCKBIT_bit_0"
+              id="LOCKBIT_bit_0" title="Bit 0: (Default: 1)" alt="Bit 0: (Default: 1)" tabindex="50"
+              onchange="applyCheckboxBits('LOCKBIT', 0);" onclick="applyCheckboxBits('LOCKBIT', 0);"
+              ondblclick="applyCheckboxBits('LOCKBIT', 0);" onfocus="applyCheckboxBits('LOCKBIT', 0);"
+              onblur="applyCheckboxBits('LOCKBIT', 0);" onkeyup="applyCheckboxBits('LOCKBIT', 0);"
+              onselect="applyCheckboxBits('LOCKBIT', 0);" /><label for="LOCKBIT_bit_0" class="bit_checkbox_label"
+              id="LOCKBIT_bit_0_label" title="Bit 0: (Default: 1)">Bit 0</label></td>
+        </tr>
+        <tr class="byte_table_def_row" id="byte_table_def_row">
+          <td class="byte_table_def_label_cell" id="byte_table_def_label_cell">Default</td>
+          <td class="byte_table_def_cell"><input type="button" value="0x41" class="apply_default_button"
+              id="apply_default_LOW_button" name="apply_default_LOW_button"
+              title="Apply the default value of 0x41 to the LOW fuse"
+              alt="Apply the default value of 0x41 to the LOW fuse" tabindex="51"
+              onclick="applyDefaultClick('LOW', 65);" /></td>
+          <td class="byte_table_def_cell"><input type="button" value="0x99" class="apply_default_button"
+              id="apply_default_HIGH_button" name="apply_default_HIGH_button"
+              title="Apply the default value of 0x99 to the HIGH fuse"
+              alt="Apply the default value of 0x99 to the HIGH fuse" tabindex="52"
+              onclick="applyDefaultClick('HIGH', 153);" /></td>
+          <td class="byte_table_def_cell"><input type="button" value="0xFF" class="apply_default_button"
+              id="apply_default_EXTENDED_button" name="apply_default_EXTENDED_button"
+              title="Apply the default value of 0xFF to the EXTENDED fuse"
+              alt="Apply the default value of 0xFF to the EXTENDED fuse" tabindex="53"
+              onclick="applyDefaultClick('EXTENDED', 255);" /></td>
+          <td class="byte_table_def_cell"><input type="button" value="0xFF" class="apply_default_button"
+              id="apply_default_LOCKBIT_button" name="apply_default_LOCKBIT_button"
+              title="Apply the default value of 0xFF to the LOCKBIT fuse"
+              alt="Apply the default value of 0xFF to the LOCKBIT fuse" tabindex="54"
+              onclick="applyDefaultClick('LOCKBIT', 255);" /></td>
+        </tr>
+        <tr class="textbox_row" id="textbox_row">
+          <td class="textbox_label_cell" id="textbox_label_cell"><input type="button" value="Apply" class="apply_button"
+              id="apply_button" name="apply_button"
+              title="Verify textbox contents and apply the values within the textboxes"
+              alt="Verify textbox contents and apply the values within the textboxes" tabindex="55"
+              onclick="applyFuseTextbox('LOW');applyFuseTextbox('HIGH');applyFuseTextbox('EXTENDED');applyFuseTextbox('LOCKBIT');" />
+          </td>
+          <td class="byte_textbox_cell">0x<input type="text" value="41" class="byte_textbox" id="byte_LOW_textbox"
+              name="byte_LOW_textbox" title="Edit the hexadecimal value for the LOW fuse"
+              alt="Edit the hexadecimal value for the LOW fuse" size="2" maxlength="2" tabindex="56"
+              onclick="applyFuseTextbox('LOW');" ondblclick="applyFuseTextbox('LOW');"
+              onfocus="applyFuseTextbox('LOW');" onblur="applyFuseTextbox('LOW');"
+              onselect="applyFuseTextbox('LOW');" /></td>
+          <td class="byte_textbox_cell">0x<input type="text" value="99" class="byte_textbox" id="byte_HIGH_textbox"
+              name="byte_HIGH_textbox" title="Edit the hexadecimal value for the HIGH fuse"
+              alt="Edit the hexadecimal value for the HIGH fuse" size="2" maxlength="2" tabindex="57"
+              onclick="applyFuseTextbox('HIGH');" ondblclick="applyFuseTextbox('HIGH');"
+              onfocus="applyFuseTextbox('HIGH');" onblur="applyFuseTextbox('HIGH');"
+              onselect="applyFuseTextbox('HIGH');" /></td>
+          <td class="byte_textbox_cell">0x<input type="text" value="FF" class="byte_textbox" id="byte_EXTENDED_textbox"
+              name="byte_EXTENDED_textbox" title="Edit the hexadecimal value for the EXTENDED fuse"
+              alt="Edit the hexadecimal value for the EXTENDED fuse" size="2" maxlength="2" tabindex="58"
+              onclick="applyFuseTextbox('EXTENDED');" ondblclick="applyFuseTextbox('EXTENDED');"
+              onfocus="applyFuseTextbox('EXTENDED');" onblur="applyFuseTextbox('EXTENDED');"
+              onselect="applyFuseTextbox('EXTENDED');" /></td>
+          <td class="byte_textbox_cell">0x<input type="text" value="FF" class="byte_textbox" id="byte_LOCKBIT_textbox"
+              name="byte_LOCKBIT_textbox" title="Edit the hexadecimal value for the LOCKBIT fuse"
+              alt="Edit the hexadecimal value for the LOCKBIT fuse" size="2" maxlength="2" tabindex="59"
+              onclick="applyFuseTextbox('LOCKBIT');" ondblclick="applyFuseTextbox('LOCKBIT');"
+              onfocus="applyFuseTextbox('LOCKBIT');" onblur="applyFuseTextbox('LOCKBIT');"
+              onselect="applyFuseTextbox('LOCKBIT');" /></td>
+        </tr>
+        <tr class="dudecmd_row" id="dudecmd_row">
+          <td class="dudecmd_label_cell" id="dudecmd_label_cell">AVRDUDE</td>
+          <td class="dudecmd_cell"> -U lfuse:w:0x<span class="dudecmd_val_span" id="dudecmd_LOW_val_span">41</span>:m
+          </td>
+          <td class="dudecmd_cell"> -U hfuse:w:0x<span class="dudecmd_val_span" id="dudecmd_HIGH_val_span">99</span>:m
+          </td>
+          <td class="dudecmd_cell"> -U efuse:w:0x<span class="dudecmd_val_span"
+              id="dudecmd_EXTENDED_val_span">FF</span>:m </td>
+          <td class="dudecmd_cell"> -U lock:w:0x<span class="dudecmd_val_span" id="dudecmd_LOCKBIT_val_span">FF</span>:m
+          </td>
+        </tr>
+        <tr class="permalink_row" id="permalink_row">
+          <td class="permalink_label_cell" id="permalink_label_cell">Perma-Link:</td>
+          <td class="permalink_cell" id="permalink_cell" colspan="4"><input type="text"
+              value="Click me to generate permalink URL." class="permalink_textbox" id="permalink_textbox"
+              name="permalink_textbox" title="Copy this to save this page for later or to show to a friend."
+              alt="Copy this to save this page for later or to show to a friend." tabindex="60"
+              onclick="permaLinkClick();" /></td>
+        </tr>
+      </table>
+    </div>
+  </form>
+  <div class="bottom_div" id="bottom_div">
+    <div id="hidemeatstart">
+      <h2>Your javascript is off, this calculator will not work.</h2>
+    </div>
+    <script type="text/javascript">
+      function hidediv(id) {
+        //safe function to hide an element with a specified id
+        if (document.getElementById) { // DOM3 = IE5, NS6
+          document.getElementById(id).style.display = 'none';
+        }
+        else {
+          if (document.layers) { // Netscape 4
+            document.id.display = 'none';
+          }
+          else { // IE 4
+            document.all.id.style.display = 'none';
+          }
+        }
+      }
+      hidediv("hidemeatstart");
+    </script>
+    <div id="help_div" class="help_div">
+      <p class="help_p">This is a javascript based AVR fuse calculator. You must have javascript enabled to use this.
+        There are lots of places with mouse-over text (alt-text) to provide some help. </p>
+      <p class="help_p">You can select a AVR chip from the dropdown menu at the top of the page. If a chip is marked as
+        "similar", it means that chip has identical fuses and preset collections as the currently selected chip</p>
+      <p class="help_p">When you select another chip, the fuse settings from the current chip will be applied to the new
+        chip (even if the chips are not similar). </p>
+      <p class="help_p">Presets are known defined settings available for the AVR chip you've selected. Changing a preset
+        setting will automatically apply the changes to the fuse bits. </p>
+      <p class="help_p">Manually manipulating the fuse bits will also cause the calculator to find the preset that
+        matches the fuse bit setting. </p>
+      <p class="help_p">Be extra careful about anything with a star *, the star * means the setting is related to ISP
+        programming. If ISP programming becomes disabled (by disabling SPI programming, disabling the reset pin, or
+        enabling debugWIRE), you will require special equipment (HV programmer, parallel programmer, or something with
+        debugWIRE) to change them back. </p>
+      <p class="help_p">The AVRDUDE commands may be used as arguments with AVRDUDE to program the fuses. </p>
+      <p class="help_p">Some bits that are undefined may not be verified as correct, but as they are undefined, that's
+        usually not a problem. </p>
+      <p class="help_p">Make sure you don't mess up your chip by disabling the programming features or locking the chip
+        completely.</p>
+      <p class="help_p">The information represented by the calculator is not guarenteed to be correct and no
+        responsibility is taken for the correctness of any information represented. Please use this tool at your own
+        risk.</p>
+      <p class="help_p">Please submit any bug reports or comments to <a href="http://eleccelerator.com/tool-fusecalc/"
+          class="bugreport_email" id="bugreport_email" name="bugreport_email">this blog post</a></p>
+      </p>
+      <p class="help_p">Copyright 2009 <a href="http://eleccelerator.com/" class="frank_link" id="frank_link"
+          name="frank_link">Frank Zhao</a>. </p>
+    </div>
+  </div>
+
+</body>
+
+</html>

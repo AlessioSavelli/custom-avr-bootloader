@@ -1,0 +1,8 @@
+| arduino nano | segnale | olimex ICSP |
+| ---          | ---     | ---         |
+| d13          | sck     | 3           |
+| d12          | miso    | 1           |
+| d11          | mosi    | 4           |
+| d10          | reset   | 5           |
+| gnd          | gnd     | 6           |
+| 3v3          | vcc     | 2           |

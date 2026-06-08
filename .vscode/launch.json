@@ -1,0 +1,83 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Compile bootloader",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "compile_bootloader"
+            ]
+        },
+        {
+            "name": "Compile application",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "compile_application"
+            ]
+        },
+        {
+            "name": "Select COM port",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "select_com"
+            ]
+        },
+        {
+            "name": "Install programmer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "install_programmer"
+            ]
+        },
+        {
+            "name": "Install bootloader through programmer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "install_bootloader"
+            ]
+        },
+        {
+            "name": "Load application through bootloader",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "load_application"
+            ]
+        },
+        {
+            "name": "Read memory with programmer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/toolchain/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "read_memory"
+            ]
+        },
+        {
+            "name": "Firmware Updater client",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/firmware-updater/main.py",
+            "console": "integratedTerminal",
+            "args": []
+        },
+    ]
+}

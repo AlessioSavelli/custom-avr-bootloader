@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Device Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js"></script>
+
+</head>
+
+<body>
+    <div class="container">
+        <h1>Firmware Updater</h1>
+
+        <div class="section" id="step-load-file">
+            <button id="button-load" onclick="loadFile()">Load file</button>
+            <p id="text-file-path"></p>
+        </div>
+
+        <div class="section" id="step-select-port" hidden>
+            <label for="select-port">Port:</label>
+            <select id="select-port" onchange="portSelected()"></select>
+            <button id="button-start" onclick="startUpdate()" disabled>Start update</button>
+        </div>
+
+        <div class="section" id="step-progress" hidden>
+            <p>Progress: <span id="progress-value">0</span>%</p>
+            <progress id="progress-bar" value="0" max="100"></progress>
+            <p>Status: <span id="status-message"></span></p>
+            <button id="button-restart" onclick="restart()" disabled>Restart</button>
+        </div>
+
+    </div>
+</body>
+
+</html>

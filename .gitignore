@@ -1,0 +1,4 @@
+__pycache__/
+application/dist/
+bootloader/dist/
+firmware-updater/lib/

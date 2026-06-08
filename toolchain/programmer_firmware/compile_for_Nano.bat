@@ -1,0 +1,1 @@
+..\arduino-cli\arduino-cli.exe compile --fqbn arduino:avr:nano --output-dir .\dist

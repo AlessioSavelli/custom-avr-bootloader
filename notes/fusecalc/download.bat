@@ -1,0 +1,1 @@
+wget.exe -O atmega32u4.html https://eleccelerator.com/fusecalc/fusecalc.php?chip=atmega32u4
