@@ -1,186 +1,166 @@
-# Custom AVR Bootloader Project
+# 🔌 Custom AVR Bootloader
 
-This repository contains a complete workflow for building, installing, and updating a custom bootloader for an ATmega32U4-based board (the same class of hardware as the Arduino Leonardo/Micro family).
+> A complete, end-to-end workflow to **build, install, and securely update** custom firmware on an ATmega32U4 board (Arduino Leonardo / Micro class).
 
-The project is split into three main parts:
-
-1. **Bootloader firmware** under `bootloader/`
-   - A LUFA-based USB bootloader for the ATmega32U4.
-   - Handles USB communication, command parsing, memory programming, and application launch.
-
-2. **Toolchain utilities** under `toolchain/`
-   - Python scripts to compile the bootloader and application, install the programmer, upload firmware, and manage COM port selection.
-   - Also includes the low-level protocol logic used to talk to the bootloader.
-
-3. **Firmware updater GUI** under `firmware-updater/`
-   - A small PyWebView-based desktop application that lets a user load an encrypted firmware file and update the device through the bootloader.
+![MCU](https://img.shields.io/badge/MCU-ATmega32U4-1f6feb)
+![Boot section](https://img.shields.io/badge/boot%20section-4%20KB-orange)
+![Cipher](https://img.shields.io/badge/cipher-Speck%2032%2F64--CTR-2ea44f)
+![USB](https://img.shields.io/badge/USB-CDC%20%C2%B7%20LUFA-8957e5)
+![Toolchain](https://img.shields.io/badge/toolchain-Python%203-3776ab)
 
 ---
 
-## Changes in this fork (security & size)
+## 📑 Table of contents
 
-This fork hardens the firmware encryption and reworks the bootloader so that a
-**real block cipher fits in the same 4 KB boot section** that previously barely
-held a trivial cipher.
+- [✨ What this project does](#-what-this-project-does)
+- [🔐 Changes in this fork (security & size)](#-changes-in-this-fork-security--size)
+- [🗂️ Project structure](#-project-structure)
+- [🔁 Main workflow](#-main-workflow)
+- [🧰 Requirements](#-requirements)
+- [⚙️ Using the toolchain](#-using-the-toolchain)
+- [🖥️ Firmware updater](#-firmware-updater)
+- [📝 Notes](#-notes)
 
-### Stronger encryption
-- **Before:** XOR with a repeating key, where the key was the trivial sequence
-  `0x00, 0x01, … 0x7F`. This is effectively a Vigenère cipher: the first byte was
-  left in clear (key starts at `0x00`), there was no diffusion, and identical
-  plaintext pages produced identical ciphertext.
-- **After:** **Speck 32/64 in CTR mode** — a genuine lightweight block cipher
-  (64-bit secret key, 22 rounds). Each flash page is encrypted with a **per-page
-  nonce** (the page address), so identical pages no longer map to identical
-  ciphertext and there is no keystream reuse. The page address now travels in
-  clear (it is the public CTR nonce); only the 128 data bytes are encrypted.
-- **Validated three ways:** against the official Speck32/64 test vector, byte-for-byte
-  between the C firmware and the Python toolchain, and by running the AVR-compiled
-  cipher inside the `avr-gdb` simulator — all producing identical output.
+---
 
-### Memory footprint (ATmega32U4, 4 KB boot section — a hard ceiling)
+## ✨ What this project does
+
+The repository provides a practical, end-to-end custom firmware update path for an AVR board:
+
+- 🏗️ build a custom bootloader,
+- 📥 install it on the target device,
+- 🧱 compile an application image,
+- 📦 package it for a secure update,
+- 🚀 and send it to the board through the bootloader protocol.
+
+It is split into **three main parts**:
+
+| Part | Folder | Role |
+|------|--------|------|
+| 🔧 **Bootloader firmware** | `bootloader/` | LUFA-based USB bootloader for the ATmega32U4: USB communication, command parsing, memory programming, application launch. |
+| 🐍 **Toolchain** | `toolchain/` | Python scripts to compile, install the programmer, flash, package firmware, and pick the COM port — plus the low-level bootloader protocol. |
+| 🖥️ **Firmware updater GUI** | `firmware-updater/` | A small PyWebView desktop app to load an encrypted firmware file and update the device. |
+
+---
+
+## 🔐 Changes in this fork (security & size)
+
+This fork **hardens the firmware encryption** and reworks the bootloader so that a
+**real block cipher fits in the same 4 KB boot section** that previously barely held a trivial one.
+
+### 🛡️ Stronger encryption
+
+| | Before | After |
+|---|--------|-------|
+| Scheme | repeating-key **XOR** | **Speck 32/64 in CTR mode** |
+| Key | trivial `0x00, 0x01, … 0x7F` | **64-bit secret** key |
+| Weaknesses | first byte in clear, no diffusion, identical pages → identical ciphertext | per-page **nonce** (page address) → no keystream reuse, no identical-page leak |
+
+- ✅ **Validated three ways:** against the official **Speck32/64 test vector**, **byte-for-byte** between the C firmware and the Python toolchain, and by running the **AVR-compiled** cipher inside the `avr-gdb` simulator — all producing identical output.
+- The page address now travels in clear (it *is* the public CTR nonce); only the 128 data bytes are encrypted.
+
+### 📉 Memory footprint
+
+> ATmega32U4 · the **4 KB boot section is a hard ceiling** (cannot be enlarged).
+
 | Metric | Before (XOR) | After (Speck) |
 |--------|-------------:|--------------:|
 | Flash `Program` | 4076 B | **4088 B** |
-| RAM (`.data + .bss`) | 308 B | **174 B** (−43 %) |
-| Cipher strength | repeating-key XOR | real block cipher (Speck32/64-CTR) |
+| RAM (`.data + .bss`) | 308 B | **174 B** *(−43 %)* |
+| Cipher strength | repeating-key XOR | real block cipher 🔒 |
 
-The cipher itself grew (~304 B → ~416 B of code + key), but that cost was paid for
-by size optimizations so the net flash change is only +12 B:
-- **LTO** (link-time optimization) enabled: ≈ −132 B;
-- Speck core shrunk from 488 B → 408 B (on-the-fly key schedule, shift-register
-  instead of `l[i % 3]`, byte-swap rotations);
-- bootloader **timer changed from 32-bit to 16-bit** (the 60 s timeout fits in 16
-  bits): ≈ −150 B and most of the RAM saving;
-- secret key shrunk from 128 B to 8 B.
+The cipher itself grew (~304 B → ~416 B of code + key), but that cost was **paid back by size optimizations**, so the net flash change is only **+12 B**:
 
-> ⚠️ **To deploy:** set your own secret key in `bootloader/src/Password.h`
-> (`SPECK_KEY`, shared automatically with the Python toolchain), and **re-generate
-> `application.fw`** — the `.fw` format changed and old files are incompatible.
-> LTO and the 16-bit timer are validated in simulation only and should be confirmed
-> on real hardware.
+- 🔗 **LTO** (link-time optimization) enabled — *≈ −132 B*
+- ⚡ Speck core shrunk **488 B → 408 B** (on-the-fly key schedule, shift-register instead of `l[i % 3]`, byte-swap rotations)
+- ⏱️ bootloader **timer 32-bit → 16-bit** (the 60 s timeout fits in 16 bits) — *≈ −150 B* and most of the RAM saving
+- 🔑 secret key shrunk **128 B → 8 B**
 
-Full details: [`bootloader/src/criptography.md`](bootloader/src/criptography.md) and
-[`bootloader/docs/analisi-memoria.md`](bootloader/docs/analisi-memoria.md).
+> ⚠️ **Before you deploy**
+> - Set your **own** secret key in [`bootloader/src/Password.h`](bootloader/src/Password.h) (`SPECK_KEY`, shared automatically with the Python toolchain).
+> - **Re-generate `application.fw`** — the `.fw` format changed, old files are incompatible.
+> - LTO and the 16-bit timer are validated **in simulation only** → confirm on real hardware.
 
-## What this project does
-
-The goal of this repository is to provide a practical, end-to-end custom firmware update path for an AVR board:
-
-- build a custom bootloader,
-- install it on the target device,
-- compile an application image,
-- package it for secure update,
-- and send it to the board through the bootloader protocol.
-
-The design includes:
-
-- USB bootloader support for ATmega32U4,
-- a simple command protocol between PC and bootloader,
-- encrypted firmware payload handling,
-- a small GUI for updating firmware from a desktop environment.
+📖 Full details: [`bootloader/src/criptography.md`](bootloader/src/criptography.md) · [`bootloader/docs/memory-analysis.md`](bootloader/docs/memory-analysis.md)
 
 ---
 
-## Project structure
+## 🗂️ Project structure
 
-- `bootloader/`  
-  Source code and build files for the USB bootloader.
-
-- `application/`  
-  Example application sketch used as the user firmware.
-
-- `toolchain/`  
-  Python automation scripts for building, installing, and flashing the bootloader/application.
-
-- `firmware-updater/`  
-  GUI-based firmware updater application built with PyWebView.
-
-- `docs/`  
-  Notes and reference material for the protocol and implementation details.
+```
+custom-avr-bootloader/
+├── bootloader/        🔧 USB bootloader firmware (C + LUFA) and build files
+│   ├── src/              source + per-module docs (incl. criptography.md)
+│   └── docs/             analysis notes (memory/size study)
+├── application/       🧱 example application sketch (user firmware)
+├── toolchain/         🐍 Python automation: build, install, flash, package
+├── firmware-updater/  🖥️ PyWebView GUI updater
+└── notes/             📝 protocol notes, to-dos, reference material
+```
 
 ---
 
-## Main workflow
+## 🔁 Main workflow
 
-1. Compile the bootloader.
-2. Install the programmer support on the board.
-3. Flash the custom bootloader to the target device.
-4. Compile the application firmware.
-5. Convert the application into the firmware format expected by the bootloader.
-6. Use the updater tool to send the encrypted firmware image to the board.
+1. 🔨 Compile the bootloader.
+2. 🔌 Install the programmer support on the board.
+3. ⬇️ Flash the custom bootloader to the target device.
+4. 🧱 Compile the application firmware.
+5. 📦 Convert the application into the firmware format expected by the bootloader.
+6. 🚀 Use the updater tool to send the encrypted firmware image to the board.
 
-This makes the project useful both as a learning tool and as a starting point for custom AVR firmware update pipelines.
+Useful both as a learning tool and as a starting point for custom AVR firmware update pipelines.
 
 ---
 
-## Hardware and software requirements
+## 🧰 Requirements
 
-### Hardware
-
-- An ATmega32U4-based board (Leonardo/Micro class)
+**Hardware** 🛠️
+- An ATmega32U4-based board (Leonardo / Micro class)
 - USB connection for programming and update operations
-- A compatible AVR programmer/programming interface for initial bootloader installation
+- A compatible AVR programmer for the initial bootloader installation
 
-### Software
-
+**Software** 💾
 - Python 3
-- Arduino CLI (used for application compilation)
+- Arduino CLI (application compilation)
 - AVR-GCC / AVR toolchain
 - avrdude
-- PyWebView for the GUI updater
+- PyWebView (GUI updater)
 
 ---
 
-## How to use the toolchain
+## ⚙️ Using the toolchain
 
-The Python entry point under `toolchain/` is the main automation interface.
+The Python entry point under `toolchain/` is the main automation interface
+(`toolchain/main.py`). Typical operations:
 
-Typical operations include:
-
-- compile the bootloader,
-- compile the application,
-- select a COM port,
-- install the programmer,
-- install the bootloader,
-- load an application image,
-- read memory.
-
-The actual command entry point is the script:
-
-- `toolchain/main.py`
+- 🔨 compile the bootloader / application
+- 🔌 select a COM port
+- 📥 install the programmer / bootloader
+- 🚀 load an application image
+- 🔍 read memory
 
 ---
 
-## Firmware updater
+## 🖥️ Firmware updater
 
 The updater under `firmware-updater/` provides a desktop GUI that:
 
-- opens a firmware file,
-- lists available serial ports,
-- starts the update process,
-- and reports progress/status back to the user.
+- 📂 opens a firmware file,
+- 🔌 lists available serial ports,
+- ▶️ starts the update process,
+- 📊 reports progress/status back to the user.
 
 This is the user-facing update flow for the custom bootloader.
 
 ---
 
-## Notes
+## 📝 Notes
 
-- The firmware update path encrypts memory-write payloads with Speck 32/64 in CTR
-  mode (see "Changes in this fork" above). Note that encryption provides
-  confidentiality only, not authenticity — a signature/MAC would be needed for a
-  fully secure update path.
-- The bootloader protocol is intentionally simple and designed for controlled firmware updates.
-- This repository is still a development project, so some parts may be incomplete or experimental depending on the current branch state.
+- 🔐 Memory-write payloads are encrypted with **Speck 32/64 in CTR mode** (see [Changes in this fork](#-changes-in-this-fork-security--size)). Encryption provides **confidentiality only, not authenticity** — a signature/MAC would be needed for a fully secure update path.
+- 🧩 The bootloader protocol is intentionally simple and designed for controlled firmware updates.
+- 🚧 This is still a development project — some parts may be incomplete or experimental depending on the current branch state.
 
 ---
 
-## Summary
-
-This repository combines:
-
-- custom AVR bootloader firmware,
-- a build and flashing toolchain,
-- and a GUI-based updater.
-
-Together, these pieces form a small but complete ecosystem for custom AVR firmware deployment.
+<sub>🔧 Custom AVR bootloader firmware · 🐍 build & flashing toolchain · 🖥️ GUI updater — a small but complete ecosystem for custom AVR firmware deployment.</sub>
