@@ -49,7 +49,7 @@ A message between devices (PC and bootloader) has the following structure:
    - **Response Message**:
      - **Status**: `CP_PROCESSED`, `CP_FLASH_ADDRESS_NOT_ALIGNED`, `CP_FLASH_ADDRESS_OUT_OF_BOUNDS`
      - **Response**: Written flash page address
-     - **Payload**: `[page address (2 bytes)]` (after encryption)
+     - **Payload**: `[page address (2 bytes)]` (in clear — see "Encryption" below)
 
 4. **CMD_START_SKETCH** (`0x03`)
    - **Description**: Start the main application (sketch).
@@ -76,14 +76,17 @@ A message between devices (PC and bootloader) has the following structure:
 - **Response Payload**: No data.
 
 ### **CMD_WRITE_MEMORY_PAGE**
-- **Description**: Writes a flash memory page at a specified address. The data is decrypted before writing and encrypted before sending the response.
+- **Description**: Writes a flash memory page at a specified address. The page
+  address (first 2 payload bytes) travels in clear and is used as the encryption
+  nonce; only the 128 data bytes are encrypted (see "Encryption" below). The data
+  is decrypted before writing; the response address is returned in clear.
 - **Behavior**:
   - If the address is not correctly aligned or is out of the bootloader memory bounds, the response contains an error:
     - `CP_FLASH_ADDRESS_NOT_ALIGNED`: The page address is not aligned to the page size.
     - `CP_FLASH_ADDRESS_OUT_OF_BOUNDS`: The page address is outside the valid range.
   - If the command succeeds, the response contains the written page address.
 - **Command Code**: `0x02`
-- **Response Payload**: `[page_address (2 bytes)]` (after encryption).
+- **Response Payload**: `[page_address (2 bytes)]` (in clear).
 
 ### **CMD_START_SKETCH**
 - **Description**: Starts the main application (sketch) and disables the bootloader.
@@ -122,3 +125,26 @@ The response for each command follows this structure:
 4. **Response from device B to A**:
    - Status: `CP_PROCESSED`
    - Message: `0x55 | Identifier_2 | CP_PROCESSED | 2 | [0x00, 0x01] | CRC` (Written page address)
+
+## Encryption
+
+Memory-write payloads are protected with **Speck 32/64 in CTR mode** (a lightweight
+block cipher), replacing the previous repeating-key XOR. See
+[`src/criptography.md`](src/criptography.md) for the full description.
+
+`CMD_WRITE_MEMORY_PAGE` payload layout (130 bytes):
+
+```
+[ addr_hi | addr_lo |            128 data bytes            ]
+  \___ in clear ___/  \___ encrypted: Speck32/64-CTR ____/
+        (nonce)         (keystream nonce = page address)
+```
+
+- The page address is the public CTR **nonce**, so it travels in clear; using a
+  per-page nonce means identical pages no longer produce identical ciphertext.
+- Encrypt and decrypt are the same operation (XOR with the keystream).
+- The secret key lives in `src/Password.h` (`SPECK_KEY`, 64-bit) and is shared,
+  byte-identical, with the Python toolchain.
+- The message `CRC` covers the on-wire bytes (address + encrypted data); it is an
+  integrity check, **not** a cryptographic authentication. A signature/MAC would be
+  needed for a fully secure (authenticated) update path.

@@ -39,3 +39,14 @@
 - [x] bootloader request
 - [x] transfer of .fw to the board
 
+## Security & size hardening (this fork)
+- [x] replace repeating-key XOR with Speck 32/64-CTR (real block cipher, 64-bit key)
+- [x] per-page nonce (page address) -> no keystream reuse, no identical-page leak
+- [x] cross-validation: official Speck test vector + C/Python + avr-gdb simulator
+- [x] keep the robust cipher within the 4 KB boot section (4076 -> 4088 B)
+- [x] size/RAM optimizations: LTO, on-the-fly key schedule, 16-bit timer, 8 B key
+      (RAM .data+.bss 308 -> 174 B)
+- [~] validate LTO + 16-bit timer on real hardware (only simulated so far)
+- [] authenticity (signature/MAC) - currently confidentiality only
+- [] optional: rewrite Speck core in AVR assembly for more flash headroom
+

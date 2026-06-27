@@ -39,3 +39,10 @@ Messages:
 - B -> F: Update status:
   - in progress (% complete)
   - finished (possible errors)
+
+## Note on encryption
+
+The `.fw` file is encrypted with **Speck 32/64 in CTR mode** (the toolchain and the
+bootloader share the same secret key). The updater only relays the already-encrypted
+pages to the board, so neither the user nor this GUI needs — or is able — to decrypt
+the firmware contents. See [`../bootloader/src/criptography.md`](../bootloader/src/criptography.md).
